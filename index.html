@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>돌 던지기 아레나 1v1</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #141824; color: #fff; font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+  
+  #lobby {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    background: radial-gradient(circle at top, #1f273d, #111520);
+    z-index: 10; padding: 12px; overflow: hidden;
+  }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-shrink: 0; }
+  .title { font-size: 18px; font-weight: 800; color: #ffd166; text-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+  .stats { font-size: 12px; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 20px; }
+  
+  .top-action-box {
+    background: rgba(30, 37, 56, 0.95); border: 1px solid #3b476b; border-radius: 12px;
+    padding: 10px; margin-bottom: 8px; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .profile-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .profile-row input[type="text"] {
+    flex: 1; background: #111520; border: 1px solid #3b476b; border-radius: 8px;
+    padding: 6px 10px; color: #fff; font-size: 13px; font-weight: bold;
+  }
+  .profile-row label { font-size: 12px; color: #cbd5e1; display: flex; align-items: center; gap: 4px; }
+  .profile-row input[type="color"] { border: none; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; background: none; }
+
+  .unlock-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; }
+  .unlock-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: bold; color: #ffd166; }
+  .unlock-row input { width: 16px; height: 16px; accent-color: #ffd166; }
+  
+  .btn-row { display: flex; gap: 8px; }
+  .btn {
+    flex: 1; padding: 10px 6px; border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 800; cursor: pointer; color: #111;
+  }
+  .btn-ai { background: #06d6a0; }
+  .btn-pvp { background: #ffd166; }
+
+  #selected-info { font-size: 11px; color: #cbd5e1; margin-top: 6px; text-align: center; }
+
+  #stone-grid-wrapper {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding-right: 2px; padding-bottom: 30px;
+  }
+  #stone-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  }
+  .stone-card {
+    background: #1e2538; border: 2px solid #2e3854; border-radius: 10px;
+    padding: 6px 2px; text-align: center; cursor: pointer; position: relative;
+    transition: transform 0.1s, border-color 0.15s; touch-action: manipulation;
+  }
+  .stone-card:active { transform: scale(0.95); }
+  .stone-card.selected { border-color: #ffd166; background: #2a3450; box-shadow: 0 0 10px rgba(255,209,102,0.4); }
+  .stone-card.locked { opacity: 0.45; }
+  .stone-icon { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 3px; border: 2px solid rgba(255,255,255,0.3); }
+  .stone-name { font-size: 10px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stone-grade { font-size: 8px; margin-top: 1px; font-weight: 600; }
+  .stone-req { font-size: 8px; color: #aaa; margin-top: 1px; }
+
+  #pvp-modal {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    z-index: 30; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-box {
+    background: #1e2538; border: 1px solid #3b476b; border-radius: 16px;
+    padding: 20px; width: 100%; max-width: 340px; text-align: center;
+  }
+  .modal-box h3 { margin-bottom: 10px; color: #ffd166; }
+  .code-box {
+    background: #111520; padding: 12px; border-radius: 10px; font-size: 22px;
+    font-weight: 900; letter-spacing: 3px; color: #06d6a0; margin: 10px 0;
+    border: 1px dashed #06d6a0; user-select: text; -webkit-user-select: text;
+  }
+  .input-code {
+    width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #3b476b;
+    background: #111520; color: #fff; font-size: 18px; text-align: center;
+    letter-spacing: 2px; margin-bottom: 10px; text-transform: uppercase;
+  }
+  .status-text { font-size: 12px; color: #94a3b8; margin: 8px 0; min-height: 18px; }
+
+  #game-container { display: none; position: fixed; inset: 0; background: #0d111a; touch-action: none; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #hud {
+    position: fixed; top: 10px; left: 10px; right: 10px;
+    display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+  }
+  .hp-box { background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 10px; font-size: 13px; font-weight: bold; }
+  .btn-exit { pointer-events: auto; background: #ef4444; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; font-weight: bold; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- 오디오 요소 (Hello, Hawaii Five-O는 loop 지정 / Tiki Tiki, Ishowspeed는 단발성 재생) -->
+<audio id="bgm-hello" src="hello.mp3" loop></audio>
+<audio id="battle-hawaii" src="hawaii_five_o.mp3" loop></audio>
+<audio id="win-tiki" src="tiki_tiki.mp3"></audio>
+<audio id="lose-speed" src="ishowspeed.mp3"></audio>
+
+<div id="lobby">
+  <div class="header">
+    <div class="title">🪨 돌 던지기 아레나</div>
+    <div class="stats">누적 킬: <span id="kill-count">0</span></div>
+  </div>
+
+  <div class="top-action-box">
+    <div class="profile-row">
+      <input type="text" id="player-nickname" placeholder="닉네임 입력" maxlength="10">
+      <label>색상: <input type="color" id="player-color" value="#38bdf8"></label>
+    </div>
+    <div class="unlock-row">
+      <label><input type="checkbox" id="unlock-all"> 전체 20종 돌 무료 해금</label>
+      <span style="color:#94a3b8; font-size:11px;">아래에서 돌 선택</span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ai" onclick="startGame('ai')">🤖 AI 1:1 연습</button>
+      <button class="btn btn-pvp" onclick="openPvpModal()">⚔️ 친구 1:1 대전</button>
+    </div>
+    <div id="selected-info">돌을 선택하세요</div>
+  </div>
+
+  <div id="stone-grid-wrapper">
+    <div id="stone-grid"></div>
+  </div>
+</div>
+
+<div id="pvp-modal">
+  <div class="modal-box">
+    <h3>⚔️ 실시간 친구 1:1 대전</h3>
+    <p style="font-size:12px; color:#cbd5e1;">내 방 코드를 친구에게 알려주거나, 친구 코드를 입력하세요.</p>
+    <div class="code-box" id="my-room-code">생성 중...</div>
+    <div class="status-text" id="pvp-status">서버 준비 중...</div>
+    <input type="text" id="join-code-input" class="input-code" placeholder="친구 방 코드 4자리" maxlength="6">
+    <div class="btn-row">
+      <button class="btn" style="background:#475569; color:#fff;" onclick="closePvpModal()">닫기</button>
+      <button class="btn btn-ai" onclick="joinFriendRoom()">입장하기</button>
+    </div>
+  </div>
+</div>
+
+<div id="game-container">
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud">
+    <div class="hp-box" style="color:#38bdf8;"><span id="hud-my-name">나</span>: <span id="my-hp">150</span> HP</div>
+    <button class="btn-exit" onclick="exitGame()">나가기</button>
+    <div class="hp-box" style="color:#fb7185;"><span id="hud-enemy-name">상대</span>: <span id="enemy-hp">150</span> HP</div>
+  </div>
+</div>
+
+<script>
+const GRADES = {
+  common: { name: '일반', color: '#94a3b8' },
+  uncommon: { name: '고급', color: '#4ade80' },
+  rare: { name: '희귀', color: '#38bdf8' },
+  epic: { name: '영웅', color: '#c084fc' },
+  legend: { name: '전설', color: '#fbbf24' },
+  mythic: { name: '신화', color: '#f43f5e' },
+  divine: { name: '초월', color: '#2dd4bf' }
+};
+
+const STONES = [
+  { id: 0, name: '길거리 조약돌', grade: 'common', req: 0, color: '#94a3b8', cd: 600, speed: 9, ability: 'none', desc: '기본 돌멩이 (쿨타임 0.6초)' },
+  { id: 1, name: '단단한 차돌', grade: 'common', req: 1, color: '#cbd5e1', cd: 550, speed: 10.5, ability: 'fast', desc: '비행 속도가 빠름' },
+  { id: 2, name: '이끼 낀 돌', grade: 'common', req: 2, color: '#65a30d', cd: 650, speed: 8.5, ability: 'slow', desc: '적중 시 1.5초간 이동속도 감소' },
+  { id: 3, name: '붉은 벽돌조각', grade: 'uncommon', req: 4, color: '#dc2626', cd: 600, speed: 9.5, ability: 'heavy', desc: '넉백 거리 20% 증가' },
+  { id: 4, name: '납작한 물수제비', grade: 'uncommon', req: 6, color: '#38bdf8', cd: 500, speed: 11.5, ability: 'fast', desc: '매우 빠른 직선 투척' },
+  { id: 5, name: '쌍둥이 자갈', grade: 'uncommon', req: 8, color: '#a3e635', cd: 800, speed: 9, ability: 'double', desc: '2발을 연속으로 빠르게 투척' },
+  { id: 6, name: '얼음 결정석', grade: 'rare', req: 10, color: '#7dd3fc', cd: 750, speed: 9.5, ability: 'freeze', desc: '적중 시 1초간 빙결(이동 불가)' },
+  { id: 7, name: '화산 현무암', grade: 'rare', req: 13, color: '#ea580c', cd: 700, speed: 10, ability: 'burn', desc: '적중 시 추가 화상 피해(+5)' },
+  { id: 8, name: '자석 철광석', grade: 'rare', req: 16, color: '#6366f1', cd: 750, speed: 9, ability: 'homing', desc: '상대 방향으로 살짝 휘어짐' },
+  { id: 9, name: '산산조각 석영', grade: 'epic', req: 20, color: '#e879f9', cd: 850, speed: 9.5, ability: 'triple', desc: '부채꼴 3갈래로 동시 투척' },
+  { id: 10, name: '흡혈 루비석', grade: 'epic', req: 24, color: '#e11d48', cd: 800, speed: 9.5, ability: 'vamp', desc: '적중 시 내 체력 10 회복' },
+  { id: 11, name: '번개 호박석', grade: 'epic', req: 28, color: '#facc15', cd: 650, speed: 13, ability: 'lightning', desc: '초고속 번개 투척' },
+  { id: 12, name: '중력 흑요석', grade: 'legend', req: 33, color: '#4c1d95', cd: 900, speed: 8.5, ability: 'pull', desc: '적중 시 상대를 중앙으로 끌어당김' },
+  { id: 13, name: '거인의 바위', grade: 'legend', req: 38, color: '#b45309', cd: 950, speed: 8, ability: 'giant', desc: '거대한 크기 + 강력한 넉백' },
+  { id: 14, name: '점멸 에메랄드', grade: 'legend', req: 44, color: '#10b981', cd: 850, speed: 10, ability: 'dash', desc: '던질 때 전방으로 짧게 돌진' },
+  { id: 15, name: '태양의 운석', grade: 'mythic', req: 50, color: '#f97316', cd: 850, speed: 11, ability: 'meteor', desc: '폭발 충격파로 넓은 판정' },
+  { id: 16, name: '심연의 진주', grade: 'mythic', req: 58, color: '#0ea5e9', cd: 800, speed: 10.5, ability: 'triple_fast', desc: '고속 3갈래 투척' },
+  { id: 17, name: '시간의 모래석', grade: 'mythic', req: 66, color: '#fde047', cd: 400, speed: 11, ability: 'rapid', desc: '쿨타임 0.4초 초연사 돌' },
+  { id: 18, name: '창세의 다이아', grade: 'divine', req: 75, color: '#67e8f9', cd: 700, speed: 13.5, ability: 'divine1', desc: '광속 투척 + 빙결 + 체력 회복' },
+  { id: 19, name: '종말의 신성석', grade: 'divine', req: 90, color: '#2dd4bf', cd: 750, speed: 12, ability: 'divine2', desc: '3갈래 광속 + 초대형 넉백' }
+];
+
+let kills = parseInt(localStorage.getItem('stone_kills') || '0');
+let nickname = localStorage.getItem('stone_nickname') || '플레이어';
+let playerColor = localStorage.getItem('stone_color') || '#38bdf8';
+let selectedStoneId = 0;
+let unlockAll = false;
+
+document.getElementById('kill-count').innerText = kills;
+const nickInput = document.getElementById('player-nickname');
+const colorInput = document.getElementById('player-color');
+nickInput.value = nickname;
+colorInput.value = playerColor;
+
+nickInput.addEventListener('input', (e) => {
+  nickname = e.target.value.trim() || '플레이어';
+  localStorage.setItem('stone_nickname', nickname);
+});
+colorInput.addEventListener('input', (e) => {
+  playerColor = e.target.value;
+  localStorage.setItem('stone_color', playerColor);
+});
+
+// 오디오 컨트롤러
+const bgmHello = document.getElementById('bgm-hello');
+const battleHawaii = document.getElementById('battle-hawaii');
+const winTiki = document.getElementById('win-tiki');
+const loseSpeed = document.getElementById('lose-speed');
+
+function playBgm() {
+  battleHawaii.pause(); battleHawaii.currentTime = 0;
+  winTiki.pause(); winTiki.currentTime = 0;
+  loseSpeed.pause(); loseSpeed.currentTime = 0;
+  bgmHello.volume = 0.5;
+  bgmHello.play().catch(e => {});
+}
+
+function playBattleMusic() {
+  bgmHello.pause(); bgmHello.currentTime = 0;
+  winTiki.pause(); winTiki.currentTime = 0;
+  loseSpeed.pause(); loseSpeed.currentTime = 0;
+  battleHawaii.volume = 0.5;
+  battleHawaii.play().catch(e => {});
+}
+
+function playWinSound() {
+  bgmHello.pause(); bgmHello.currentTime = 0;
+  battleHawaii.pause(); battleHawaii.currentTime = 0;
+  loseSpeed.pause(); loseSpeed.currentTime = 0;
+  winTiki.volume = 0.7;
+  winTiki.currentTime = 0;
+  winTiki.play().catch(e => {});
+}
+
+function playLoseSound() {
+  bgmHello.pause(); bgmHello.currentTime = 0;
+  battleHawaii.pause(); battleHawaii.currentTime = 0;
+  winTiki.pause(); winTiki.currentTime = 0;
+  loseSpeed.volume = 0.7;
+  loseSpeed.currentTime = 0;
+  loseSpeed.play().catch(e => {});
+}
+
+// 최초 화면 클릭 시 브라우저 오디오 정책 대응하여 BGM 재생
+window.addEventListener('click', () => {
+  if (bgmHello.paused && document.getElementById('lobby').style.display !== 'none') {
+    playBgm();
+  }
+}, { once: true });
+
+document.getElementById('unlock-all').addEventListener('change', (e) => {
+  unlockAll = e.target.checked;
+  renderStones();
+});
+
+function renderStones() {
+  const grid = document.getElementById('stone-grid');
+  grid.innerHTML = '';
+  STONES.forEach(s => {
+    const isUnlocked = unlockAll || kills >= s.req;
+    const card = document.createElement('div');
+    card.className = `stone-card ${selectedStoneId === s.id ? 'selected' : ''} ${!isUnlocked ? 'locked' : ''}`;
+    card.innerHTML = `
+      <div class="stone-icon" style="background:${s.color}; box-shadow: 0 0 6px ${s.color};"></div>
+      <div class="stone-name">${s.name}</div>
+      <div class="stone-grade" style="color:${GRADES[s.grade].color}">${GRADES[s.grade].name}</div>
+      <div class="stone-req">${isUnlocked ? '사용가능' : s.req + '킬'}</div>
+    `;
+    card.onclick = () => {
+      if (!isUnlocked) {
+        alert(`누적 ${s.req}킬 달성 시 해금됩니다!`);
+        return;
+      }
+      selectedStoneId = s.id;
+      renderStones();
+      updateSelectedInfo();
+    };
+    grid.appendChild(card);
+  });
+}
+
+function updateSelectedInfo() {
+  const s = STONES[selectedStoneId];
+  document.getElementById('selected-info').innerHTML =
+    `<strong style="color:${GRADES[s.grade].color}">[${GRADES[s.grade].name}] ${s.name}</strong> - ${s.desc}`;
+}
+
+renderStones();
+updateSelectedInfo();
+
+/* ================= P2P 멀티플레이 ================= */
+let peer = null;
+let conn = null;
+let isHost = false;
+let gameMode = 'ai';
+
+function generateShortCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let res = '';
+  for (let i = 0; i < 4; i++) res += chars[Math.floor(Math.random() * chars.length)];
+  return res;
+}
+
+function openPvpModal() {
+  document.getElementById('pvp-modal').style.display = 'flex';
+  if (peer) peer.destroy();
+
+  const shortCode = generateShortCode();
+  const fullId = 'stone-arena-2026-' + shortCode;
+  document.getElementById('my-room-code').innerText = shortCode;
+  document.getElementById('pvp-status').innerText = 'P2P 서버 연결 중...';
+
+  peer = new Peer(fullId, {
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    }
+  });
+
+  peer.on('open', () => {
+    document.getElementById('pvp-status').innerText = '✅ 대기 중! 친구에게 위 코드 4자리를 알려주세요.';
+  });
+
+  peer.on('connection', (connection) => {
+    conn = connection;
+    isHost = true;
+    setupConnection();
+  });
+
+  peer.on('error', (err) => {
+    document.getElementById('pvp-status').innerText = '연결 오류: 다시 열거나 코드를 확인해주세요.';
+  });
+}
+
+function joinFriendRoom() {
+  const code = document.getElementById('join-code-input').value.trim().toUpperCase();
+  if (code.length < 4) {
+    alert('친구 방 코드 4자리를 입력하세요.');
+    return;
+  }
+  document.getElementById('pvp-status').innerText = '친구 방에 접속 시도 중...';
+  isHost = false;
+  conn = peer.connect('stone-arena-2026-' + code);
+  setupConnection();
+}
+
+function setupConnection() {
+  conn.on('open', () => {
+    document.getElementById('pvp-status').innerText = '🎉 연결 성공! 게임을 시작합니다!';
+    conn.send({ type: 'profile', name: nickname, color: playerColor });
+    setTimeout(() => {
+      closePvpModal();
+      startGame('pvp');
+    }, 500);
+  });
+
+  conn.on('data', (data) => {
+    if (data.type === 'profile') {
+      enemy.name = data.name;
+      enemy.color = data.color;
+      document.getElementById('hud-enemy-name').innerText = enemy.name;
+    } else if (data.type === 'state') {
+      enemy.x = -data.x;
+      enemy.y = -data.y;
+      enemy.hp = data.hp;
+    } else if (data.type === 'shoot') {
+      spawnProjectile(false, -data.x, -data.y, -data.vx, -data.vy, data.stoneId);
+    } else if (data.type === 'hit') {
+      applyDamageToMe(data.dmg, -data.kx, -data.ky, data.ability);
+    }
+  });
+
+  conn.on('close', () => {
+    alert('상대방과 연결이 끊어졌습니다.');
+    exitGame();
+  });
+}
+
+function closePvpModal() {
+  document.getElementById('pvp-modal').style.display = 'none';
+}
+
+/* ================= 게임 엔진 ================= */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let animId = null;
+let arenaRadius = 380;
+
+let me = { x: 0, y: 200, vx: 0, vy: 0, hp: 150, radius: 18, freeze: 0, slow: 0, lastShot: 0 };
+let enemy = { x: 0, y: -200, vx: 0, vy: 0, hp: 150, radius: 18, freeze: 0, slow: 0, lastShot: 0, stoneId: 0, name: '상대', color: '#fb7185' };
+let projectiles = [];
+
+let moveTouch = null;
+let aimTouch = null;
+let keys = {};
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  arenaRadius = Math.max(300, Math.min(canvas.width, canvas.height) * 0.46);
+}
+window.addEventListener('resize', resizeCanvas);
+
+function startGame(mode) {
+  gameMode = mode;
+  document.getElementById('lobby').style.display = 'none';
+  document.getElementById('game-container').style.display = 'block';
+  resizeCanvas();
+
+  document.getElementById('hud-my-name').innerText = nickname;
+  if (gameMode === 'ai') {
+    enemy.name = 'AI 도전자';
+    enemy.color = '#fb7185';
+  }
+  document.getElementById('hud-enemy-name').innerText = enemy.name;
+
+  me = { x: 0, y: arenaRadius * 0.5, vx: 0, vy: 0, hp: 150, radius: 18, freeze: 0, slow: 0, lastShot: 0 };
+  enemy.x = 0; enemy.y = -arenaRadius * 0.5; enemy.vx = 0; enemy.vy = 0; enemy.hp = 150; enemy.freeze = 0; enemy.slow = 0;
+  enemy.stoneId = Math.floor(Math.random() * STONES.length);
+  
+  projectiles = [];
+  updateHud();
+  
+  // 전투 음악 반복 재생 시작
+  playBattleMusic();
+
+  if (animId) cancelAnimationFrame(animId);
+  gameLoop();
+}
+
+function exitGame() {
+  if (animId) cancelAnimationFrame(animId);
+  if (conn) { conn.close(); conn = null; }
+  document.getElementById('game-container').style.display = 'none';
+  document.getElementById('lobby').style.display = 'flex';
+  renderStones();
+  playBgm(); // 로비 BGM 반복 재생
+}
+
+function updateHud() {
+  document.getElementById('my-hp').innerText = Math.max(0, Math.round(me.hp));
+  document.getElementById('enemy-hp').innerText = Math.max(0, Math.round(enemy.hp));
+}
+
+function shootStone(isMine, angle) {
+  const now = Date.now();
+  const shooter = isMine ? me : enemy;
+  const sId = isMine ? selectedStoneId : enemy.stoneId;
+  const stone = STONES[sId];
+
+  if (now - shooter.lastShot < stone.cd) return;
+  shooter.lastShot = now;
+
+  if (stone.ability === 'dash') {
+    shooter.vx += Math.cos(angle) * 10;
+    shooter.vy += Math.sin(angle) * 10;
+  }
+
+  const angles = [angle];
+  if (stone.ability === 'triple' || stone.ability === 'triple_fast' || stone.ability === 'divine2') {
+    angles.push(angle - 0.22, angle + 0.22);
+  }
+
+  angles.forEach(a => {
+    const vx = Math.cos(a) * stone.speed;
+    const vy = Math.sin(a) * stone.speed;
+    spawnProjectile(isMine, shooter.x, shooter.y, vx, vy, sId);
+    if (isMine && gameMode === 'pvp' && conn && conn.open) {
+      conn.send({ type: 'shoot', x: shooter.x, y: shooter.y, vx, vy, stoneId: sId });
+    }
+  });
+
+  if (stone.ability === 'double') {
+    setTimeout(() => {
+      const vx = Math.cos(angle) * stone.speed;
+      const vy = Math.sin(angle) * stone.speed;
+      spawnProjectile(isMine, shooter.x, shooter.y, vx, vy, sId);
+      if (isMine && gameMode === 'pvp' && conn && conn.open) {
+        conn.send({ type: 'shoot', x: shooter.x, y: shooter.y, vx, vy, stoneId: sId });
+      }
+    }, 120);
+  }
+}
+
+function spawnProjectile(isMine, x, y, vx, vy, stoneId) {
+  const stone = STONES[stoneId];
+  projectiles.push({
+    isMine, x, y, vx, vy, stoneId,
+    radius: stone.ability === 'giant' || stone.ability === 'meteor' ? 14 : 8,
+    life: 110
+  });
+}
+
+function applyDamageToMe(dmg, kx, ky, ability) {
+  me.hp -= dmg;
+  me.vx += kx;
+  me.vy += ky;
+  if (ability === 'freeze' || ability === 'divine1') me.freeze = 60;
+  if (ability === 'slow') me.slow = 90;
+  if (ability === 'burn') me.hp -= 5;
+  updateHud();
+}
+
+function endGame(win) {
+  cancelAnimationFrame(animId);
+  if (win) {
+    kills++;
+    localStorage.setItem('stone_kills', kills);
+    document.getElementById('kill-count').innerText = kills;
+    playWinSound(); // 승리 시 Tiki Tiki 사운드 1회 재생
+    alert('🏆 승리! (누적 킬 +1)');
+  } else {
+    playLoseSound(); // 패배 시 Ishowspeed 사운드 1회 재생
+    alert('💀 패배! 아레나 밖으로 밀려났거나 체력이 다했습니다.');
+  }
+  exitGame();
+}
+
+function gameLoop() {
+  const now = Date.now();
+
+  let mx = 0, my = 0;
+  if (keys['KeyW'] || keys['ArrowUp']) my -= 1;
+  if (keys['KeyS'] || keys['ArrowDown']) my += 1;
+  if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+
+  if (moveTouch) {
+    const dx = moveTouch.curX - moveTouch.startX;
+    const dy = moveTouch.curY - moveTouch.startY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 4) {
+      mx = dx / dist;
+      my = dy / dist;
+    }
+  }
+
+  if (me.freeze > 0) {
+    me.freeze--;
+  } else {
+    const spd = me.slow > 0 ? 2.0 : 3.2; 
+    if (me.slow > 0) me.slow--;
+    const len = Math.hypot(mx, my);
+    if (len > 0) {
+      me.x += (mx / len) * spd;
+      me.y += (my / len) * spd;
+    }
+  }
+
+  me.x += me.vx;
+  me.y += me.vy;
+  me.vx *= 0.85;
+  me.vy *= 0.85;
+
+  if (gameMode === 'ai') {
+    const dx = me.x - enemy.x;
+    const dy = me.y - enemy.y;
+    const dist = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+
+    if (enemy.freeze > 0) {
+      enemy.freeze--;
+    } else {
+      const moveAngle = angle + Math.sin(now * 0.003) * 0.8;
+      enemy.x += Math.cos(moveAngle) * 2.2;
+      enemy.y += Math.sin(moveAngle) * 2.2;
+    }
+    enemy.x += enemy.vx;
+    enemy.y += enemy.vy;
+    enemy.vx *= 0.85;
+    enemy.vy *= 0.85;
+
+    if (dist < arenaRadius * 1.8) {
+      shootStone(false, angle + (Math.random() - 0.5) * 0.25);
+    }
+  } else if (conn && conn.open) {
+    conn.send({ type: 'state', x: me.x, y: me.y, hp: me.hp });
+  }
+
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+    const stone = STONES[p.stoneId];
+
+    if (stone.ability === 'homing') {
+      const target = p.isMine ? enemy : me;
+      const desired = Math.atan2(target.y - p.y, target.x - p.x);
+      const cur = Math.atan2(p.vy, p.vx);
+      const diff = Math.atan2(Math.sin(desired - cur), Math.cos(desired - cur));
+      const nextAngle = cur + diff * 0.05;
+      const spd = Math.hypot(p.vx, p.vy);
+      p.vx = Math.cos(nextAngle) * spd;
+      p.vy = Math.sin(nextAngle) * spd;
+    }
+
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+
+    const target = p.isMine ? enemy : me;
+    const hitDist = Math.hypot(p.x - target.x, p.y - target.y);
+
+    if (hitDist < p.radius + target.radius) {
+      const angle = Math.atan2(p.vy, p.vx);
+      let kb = 10;
+      if (stone.ability === 'heavy' || stone.ability === 'giant' || stone.ability === 'divine2') kb = 14;
+      if (stone.ability === 'pull') kb = -11;
+
+      const kx = Math.cos(angle) * kb;
+      const ky = Math.sin(angle) * kb;
+
+      if (p.isMine) {
+        if (stone.ability === 'vamp' || stone.ability === 'divine1') me.hp = Math.min(150, me.hp + 10);
+        if (gameMode === 'ai') {
+          enemy.hp -= 20;
+          if (stone.ability === 'burn') enemy.hp -= 5;
+          if (stone.ability === 'freeze' || stone.ability === 'divine1') enemy.freeze = 60;
+          enemy.vx += kx;
+          enemy.vy += ky;
+        } else if (conn && conn.open) {
+          conn.send({ type: 'hit', dmg: 20, kx, ky, ability: stone.ability });
+        }
+      } else if (gameMode === 'ai') {
+        applyDamageToMe(20, kx, ky, stone.ability);
+      }
+
+      updateHud();
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    if (p.life <= 0) projectiles.splice(i, 1);
+  }
+
+  if (Math.hypot(me.x, me.y) > arenaRadius || me.hp <= 0) {
+    endGame(false);
+    return;
+  }
+  if (gameMode === 'ai' && (Math.hypot(enemy.x, enemy.y) > arenaRadius || enemy.hp <= 0)) {
+    endGame(true);
+    return;
+  }
+  if (gameMode === 'pvp' && enemy.hp <= 0) {
+    endGame(true);
+    return;
+  }
+
+  draw();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, arenaRadius, 0, Math.PI * 2);
+  ctx.fillStyle = '#1e293b';
+  ctx.fill();
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = '#ef4444';
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(cx - arenaRadius, cy);
+  ctx.lineTo(cx + arenaRadius, cy);
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  if (aimTouch) {
+    const dx = aimTouch.curX - aimTouch.startX;
+    const dy = aimTouch.curY - aimTouch.startY;
+    if (Math.hypot(dx, dy) > 8) {
+      const angle = Math.atan2(dy, dx);
+      ctx.beginPath();
+      ctx.moveTo(cx + me.x, cy + me.y);
+      ctx.lineTo(cx + me.x + Math.cos(angle) * 160, cy + me.y + Math.sin(angle) * 160);
+      ctx.strokeStyle = 'rgba(255, 209, 102, 0.6)';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([8, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx + enemy.x, cy + enemy.y, enemy.radius, 0, Math.PI * 2);
+  ctx.fillStyle = enemy.freeze > 0 ? '#7dd3fc' : enemy.color;
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(enemy.name, cx + enemy.x, cy + enemy.y - 24);
+
+  ctx.beginPath();
+  ctx.arc(cx + me.x, cy + me.y, me.radius, 0, Math.PI * 2);
+  ctx.fillStyle = me.freeze > 0 ? '#7dd3fc' : playerColor;
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#fff';
+  ctx.fillText(nickname, cx + me.x, cy + me.y - 24);
+
+  projectiles.forEach(p => {
+    const stone = STONES[p.stoneId];
+    ctx.beginPath();
+    ctx.arc(cx + p.x, cy + p.y, p.radius, 0, Math.PI * 2);
+    ctx.fillStyle = stone.color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  if (moveTouch) {
+    ctx.beginPath();
+    ctx.arc(moveTouch.startX, moveTouch.startY, 50, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(moveTouch.curX, moveTouch.curY, 22, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.5)';
+    ctx.fill();
+  }
+  if (aimTouch) {
+    ctx.beginPath();
+    ctx.arc(aimTouch.startX, aimTouch.startY, 50, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,209,102,0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(aimTouch.curX, aimTouch.curY, 22, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 209, 102, 0.6)';
+    ctx.fill();
+  }
+}
+
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+canvas.addEventListener('mousedown', e => {
+  const cx = canvas.width / 2 + me.x;
+  const cy = canvas.height / 2 + me.y;
+  const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
+  shootStone(true, angle);
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (let t of e.changedTouches) {
+    if (t.clientX < canvas.width / 2 && !moveTouch) {
+      moveTouch = { id: t.identifier, startX: t.clientX, startY: t.clientY, curX: t.clientX, curY: t.clientY };
+    } else if (t.clientX >= canvas.width / 2 && !aimTouch) {
+      aimTouch = { id: t.identifier, startX: t.clientX, startY: t.clientY, curX: t.clientX, curY: t.clientY };
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (let t of e.changedTouches) {
+    if (moveTouch && t.identifier === moveTouch.id) {
+      moveTouch.curX = t.clientX;
+      moveTouch.curY = t.clientY;
+    } else if (aimTouch && t.identifier === aimTouch.id) {
+      aimTouch.curX = t.clientX;
+      aimTouch.curY = t.clientY;
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  for (let t of e.changedTouches) {
+    if (moveTouch && t.identifier === moveTouch.id) {
+      moveTouch = null;
+    } else if (aimTouch && t.identifier === aimTouch.id) {
+      const dx = aimTouch.curX - aimTouch.startX;
+      const dy = aimTouch.curY - aimTouch.startY;
+      if (Math.hypot(dx, dy) > 8) {
+        shootStone(true, Math.atan2(dy, dx));
+      } else {
+        shootStone(true, Math.atan2(enemy.y - me.y, enemy.x - me.x));
+      }
+      aimTouch = null;
+    }
+  }
+}, { passive: false });
+</script>
+</body>
+</html>
