@@ -558,9 +558,10 @@ const STONES = [
   { id: 19, rarity: 'divine',    shape: 'poseidon',  name: '포세이돈의 돌',    req: 38, secretReq: 0,  dmg: 15, cd: 1500, speed: 11,  radius: 15, knock: 10, special: 'poseidon', desc: '적중 시 포세이돈의 삼지창이 꽂혀 50의 추가 피해를 줍니다(창 쿨타임 10초). (돌 데미지 15 / 쿨타임 1.5초)' },
   { id: 20, rarity: 'divine',    shape: 'naruto',    name: '나루토의 돌',      req: 42, secretReq: 0,  dmg: 15, cd: 2000, speed: 11.5,radius: 15, knock: 12, special: 'naruto', desc: '5초마다 나선환이 장전됩니다! 나선환 장착 시 데미지 +10 (빗나가면 소멸). (기본 15 / 쿨타임 2.0초)' },
 
+  // 시크릿 돌 (밸런스 패치 적용)
   { id: 21, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 야광 거북이 돌', req: 999, secretReq: 10, dmg: 30, cd: 1000, speed: 5.5, radius: 18, knock: 14, desc: '[친구 대전 10킬 해금] 느리지만 묵직한 야광 거북이 일격! (데미지 30 / 쿨타임 1.0초)' },
-  { id: 22, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 포도당 돌',      req: 999, secretReq: 20, dmg: 20, cd: 3000, speed: 10.5,radius: 15, knock: 10, special: 'glucose', desc: '[친구 대전 20킬 해금] 적중 시 포도당 디버프(2초간 랜덤 스턴 또는 기절) 부여! (데미지 20 / 쿨타임 3.0초)' },
-  { id: 23, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 야광 포마스 돌', req: 999, secretReq: 30, dmg: 20, cd: 2000, speed: 15,  radius: 15, knock: 12, special: 'stun3', desc: '[친구 대전 30킬 해금] 평균 1.5배의 초고속 비행 + 적중 충격으로 3초간 이동 불가! (데미지 20 / 쿨타임 2.0초)' }
+  { id: 22, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 포도당 돌',      req: 999, secretReq: 20, dmg: 20, cd: 3000, speed: 10.5,radius: 15, knock: 10, special: 'glucose', desc: '[친구 대전 20킬 해금] 적중 시 혼란(조작키 반대), 2초 스턴, 감속 중 랜덤 디버프 부여!' },
+  { id: 23, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 야광 포마스 돌', req: 999, secretReq: 30, dmg: 20, cd: 2000, speed: 15,  radius: 15, knock: 12, special: 'stun1.5', desc: '[친구 대전 30킬 해금] 초고속 비행 + 적중 시 1.5초간 이동 불가! (밸런스 패치)' }
 ];
 
 function drawCustomStoneGraphic(c, shape, r, now = Date.now(), isNarutoCharged = false) {
@@ -771,7 +772,7 @@ function renderStoneGrid() {
   document.getElementById('stoneInfoBox').innerHTML = `
     <span class="rarity-tag" style="background:${curMeta.bg}; color:${curMeta.color};">${curMeta.label}</span>
     <strong style="color:${curMeta.color}; font-size:14px;">${cur.name}</strong>
-    <span style="color:#9ba3b8; font-size:12px;"> (기본 데미지: ${cur.dmg} / 쿨타임: ${(cur.cd / 1000).toFixed(1)}초)</span><br/>
+    <span style="color:#94a3b8; font-size:12px;"> (기본 데미지: ${cur.dmg} / 쿨타임: ${(cur.cd / 1000).toFixed(1)}초)</span><br/>
     <span style="color:#e2e8f0;">${cur.desc}</span>
   `;
 }
@@ -886,6 +887,7 @@ function createPlayerObj(x, y, color, nick, stoneId) {
     slowUntil: 0,
     stunUntil: 0,
     bleedUntil: 0,
+    reverseControlsUntil: 0, // 포도당 돌 혼란 디버프
     burnTicks: 0,
     lastBurnTick: 0,
     shieldCount: 0,
@@ -1150,8 +1152,21 @@ function applyHitEffects(attacker, target, stone, proj, now) {
 
   if (stone.special === 'burn') { target.burnTicks = 5; target.lastBurnTick = now; }
   if (stone.special === 'slow') { target.slowUntil = now + 2500; }
-  if (stone.special === 'stun2' || stone.special === 'glucose') { target.stunUntil = now + 2000; }
+  if (stone.special === 'stun2') { target.stunUntil = now + 2000; }
   if (stone.special === 'stun3') { target.stunUntil = now + 3000; }
+  // 💡 야광 포마스 돌 스턴 패치: 1.5초
+  if (stone.special === 'stun1.5') { target.stunUntil = now + 1500; }
+  // 💡 포도당 돌 리워크: 스턴(2초) / 감속(2.5초) / 혼란(조작키 반대 2.5초) 중 랜덤 1개 부여
+  if (stone.special === 'glucose') {
+    const r = Math.random();
+    if (r < 0.33) {
+      target.stunUntil = now + 2000;
+    } else if (r < 0.66) {
+      target.slowUntil = now + 2500;
+    } else {
+      target.reverseControlsUntil = now + 2500;
+    }
+  }
   if (stone.special === 'bleed') { target.bleedUntil = now + 5000; }
   if (stone.special === 'vampire') {
     const steal = target.hp * 0.05;
@@ -1217,8 +1232,9 @@ function update() {
   }
 
   if (now >= gameState.p1.stunUntil) {
-    let ix = (isRightPressed() ? 1 : 0) - (isLeftPressed() ? 1 : 0) + joyVec.x;
-    let iy = (isDownPressed() ? 1 : 0) - (isUpPressed() ? 1 : 0) + joyVec.y;
+    const rev = now < gameState.p1.reverseControlsUntil ? -1 : 1;
+    let ix = ((isRightPressed() ? 1 : 0) - (isLeftPressed() ? 1 : 0) + joyVec.x) * rev;
+    let iy = ((isDownPressed() ? 1 : 0) - (isUpPressed() ? 1 : 0) + joyVec.y) * rev;
     const len = Math.hypot(ix, iy);
     if (len > 1) { ix /= len; iy /= len; }
     const p1Speed = now < gameState.p1.slowUntil ? 2.1 : 4.4;
@@ -1277,6 +1293,7 @@ function update() {
       gameState.p2.bleedUntil = 0;
       gameState.p2.stunUntil = 0;
       gameState.p2.slowUntil = 0;
+      gameState.p2.reverseControlsUntil = 0;
       spawnParticles(gameState.p2.x, gameState.p2.y, '#38bdf8', 18);
     }
   } else if (conn && conn.open) {
@@ -1363,12 +1380,14 @@ function update() {
   }
   if (gameState.p1.shieldCount > 0 && now < gameState.p1.shieldUntil) p1StatusList.push(`🛡️ 방패(${gameState.p1.shieldCount})`);
   if (now < gameState.p1.bleedUntil) p1StatusList.push(`🩸 회복불가(${((gameState.p1.bleedUntil - now) / 1000).toFixed(1)}s)`);
+  if (now < gameState.p1.reverseControlsUntil) p1StatusList.push(`🌀 혼란(조작반대)(${((gameState.p1.reverseControlsUntil - now) / 1000).toFixed(1)}s)`);
   document.getElementById('specialStatusText').textContent = p1StatusList.join(' | ');
 
   let p2SpText = '';
   if (now < gameState.p2.bleedUntil) p2SpText = `🩸 회복 불가 (${((gameState.p2.bleedUntil - now) / 1000).toFixed(1)}s)`;
   else if (now < gameState.p2.stunUntil) p2SpText = `⚡ 기절/정지 (${((gameState.p2.stunUntil - now) / 1000).toFixed(1)}s)`;
-  else if (now < gameState.p2.slowUntil) p2SpText = `❄️ 이동속도 감소 (${((gameState.p2.slowUntil - now) / 1000).toFixed(1)}s)`;
+  else if (now < gameState.p2.slowUntil) p2SpText = `❄️ 감속 (${((gameState.p2.slowUntil - now) / 1000).toFixed(1)}s)`;
+  else if (now < gameState.p2.reverseControlsUntil) p2SpText = `🌀 혼란(조작반대) (${((gameState.p2.reverseControlsUntil - now) / 1000).toFixed(1)}s)`;
   document.getElementById('p2StatusText').textContent = p2SpText;
 
   if (gameState.mode !== 'practice') {
@@ -1457,12 +1476,15 @@ function draw() {
       ctx.fillStyle = pl.color;
       ctx.fill();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = now < pl.stunUntil ? '#facc15' : (now < pl.bleedUntil ? '#f43f5e' : (now < pl.slowUntil ? '#38bdf8' : '#ffffff'));
+      ctx.strokeStyle = now < pl.stunUntil ? '#facc15' : (now < pl.bleedUntil ? '#f43f5e' : (now < pl.reverseControlsUntil ? '#c084fc' : (now < pl.slowUntil ? '#38bdf8' : '#ffffff')));
       ctx.stroke();
 
       if (now < pl.stunUntil) {
         ctx.fillStyle = '#facc15'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('⚡ 기절/정지!', pl.x, pl.y - 42);
+        ctx.fillText('⚡ 기절!', pl.x, pl.y - 42);
+      } else if (now < pl.reverseControlsUntil) {
+        ctx.fillStyle = '#c084fc'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('🌀 조작 반대!', pl.x, pl.y - 42);
       } else if (now < pl.bleedUntil) {
         ctx.fillStyle = '#f43f5e'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('🩸 회복 불가!', pl.x, pl.y - 42);
