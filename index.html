@@ -530,7 +530,7 @@ const RARITY_META = {
   secret:    { label: '시크릿',   color: '#4b5563', bg: '#1f2937' }
 };
 
-// 해금 난이도 상향 조정 (나루토 돌 75킬 기준)
+// 🔒 해금 난이도 상향 유지 (나루토 돌 75킬 기준)
 const STONES = [
   { id: 0,  rarity: 'common',    shape: 'rock',      name: '그냥 돌',          req: 0,  secretReq: 0,  dmg: 20, cd: 1000, speed: 9.5, radius: 14, knock: 10, desc: '가장 기본적인 돌. (데미지 20 / 쿨타임 1.0초)' },
   { id: 1,  rarity: 'common',    shape: 'moss',      name: '이끼 낀 돌',       req: 2,  secretReq: 0,  dmg: 20, cd: 1000, speed: 9.5, radius: 14, knock: 10, special: 'moss', desc: '적중 시 이끼 독소로 추가 데미지 2를 입힙니다. (기본 20)' },
@@ -556,7 +556,7 @@ const STONES = [
   { id: 17, rarity: 'legendary', shape: 'blade',     name: '칼날 돌',          req: 65, secretReq: 0,  dmg: 20, cd: 1500, speed: 11.5,radius: 15, knock: 10, special: 'bleed', desc: '깊은 출혈을 일으켜 5초간 상대의 자연 체력 회복을 완전히 차단합니다. (데미지 20 / 쿨타임 1.5초)' },
 
   { id: 18, rarity: 'divine',    shape: 'admin',     name: '어드민 스톤',      req: 68, secretReq: 0,  dmg: 15, cd: 2000, speed: 10.5,radius: 15, knock: 8,  special: 'admin', desc: '적중 시 어드민 클론을 소환해 상대에게 돌진시킵니다(클론 데미지 8, 넉백 없음). (돌 데미지 15 / 쿨타임 2.0초)' },
-  { id: 19, rarity: 'divine',    shape: 'poseidon',  name: '포세이돈의 돌',    req: 72, secretReq: 0,  dmg: 15, cd: 1500, speed: 11,  radius: 15, knock: 10, special: 'poseidon', desc: '적중 시 포세이돈의 삼지창이 꽂혀 50의 추가 피해를 줍니다(창 쿨타임 10초). (돌 데미지 15 / 쿨타임 1.5초)' },
+  { id: 19, rarity: 'divine',    shape: 'poseidon',  name: '포세이돈의 돌',    req: 72, secretReq: 0,  dmg: 15, cd: 1500, speed: 11,  radius: 15, knock: 10, special: 'poseidon', desc: '적중 시 포세이돈의 삼지창이 꽂혀 30의 추가 피해를 줍니다(창 쿨타임 10초). (돌 데미지 15 / 쿨타임 1.5초)' },
   { id: 20, rarity: 'divine',    shape: 'naruto',    name: '나루토의 돌',      req: 75, secretReq: 0,  dmg: 15, cd: 2000, speed: 11.5,radius: 15, knock: 12, special: 'naruto', desc: '5초마다 나선환이 장전됩니다! 나선환 장착 시 데미지 +10 (빗나가면 소멸). (기본 15 / 쿨타임 2.0초)' },
 
   // 시크릿 돌 (친구 대전 전용)
@@ -701,14 +701,12 @@ let totalKills = savedData.kills || 0;
 let friendKills = savedData.friendKills || 0;
 let selectedStoneId = savedData.stone || 0;
 
-// 실제 킬 수 기반 정식 해금 여부 (친구 대전 검증용)
 function isStoneActuallyUnlocked(s) {
   if (!s) return false;
   if (s.rarity === 'secret') return friendKills >= s.secretReq;
   return totalKills >= s.req;
 }
 
-// UI 표시 및 AI/연습 모드용 해금 여부
 function isStoneUnlocked(s) {
   if (document.getElementById('unlockAllCheck').checked) return true;
   return isStoneActuallyUnlocked(s);
@@ -959,7 +957,6 @@ canvas.addEventListener('pointerdown', (e) => {
 let peer = null;
 let conn = null;
 
-// 친구 대전 입장 시 미해금 돌 강제 차단 및 기본 돌 교체
 function enforceActualUnlockedStoneForPvP() {
   const curStone = STONES[selectedStoneId] || STONES[0];
   if (!isStoneActuallyUnlocked(curStone)) {
@@ -1053,7 +1050,6 @@ function startGame(mode) {
   canvas.focus();
   resetKeys();
 
-  // 친구 대전 시작 시 한 번 더 실제 해금 여부 강제 확인
   if (mode.startsWith('p2p')) {
     enforceActualUnlockedStoneForPvP();
   }
@@ -1217,13 +1213,13 @@ function applyHitEffects(attacker, target, stone, proj, now) {
   if (stone.special === 'poseidon') {
     if (proj.owner === 1 && now - gameState.lastPoseidonTime >= 10000) {
       gameState.lastPoseidonTime = now;
-      target.hp = Math.max(0, target.hp - 50);
+      target.hp = Math.max(0, target.hp - 30); // 💡 삼지창 데미지 30 너프 적용
       gameState.tridents.push({ x: target.x, y: target.y, until: now + 700 });
       spawnParticles(target.x, target.y, '#38bdf8', 24);
       SoundManager.playSpecial();
     } else if (proj.owner === 2 && now - gameState.p2LastPoseidonTime >= 10000) {
       gameState.p2LastPoseidonTime = now;
-      target.hp = Math.max(0, target.hp - 50);
+      target.hp = Math.max(0, target.hp - 30); // 💡 삼지창 데미지 30 너프 적용
       gameState.tridents.push({ x: target.x, y: target.y, until: now + 700 });
       spawnParticles(target.x, target.y, '#38bdf8', 24);
       SoundManager.playSpecial();
