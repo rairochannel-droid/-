@@ -101,8 +101,7 @@
       margin-bottom: 12px;
       align-items: center;
     }
-    input[type="text"] {
-      flex: 1;
+    input[type="text"], select {
       padding: 10px 12px;
       border-radius: 10px;
       border: 1px solid #3b4461;
@@ -110,10 +109,13 @@
       color: #fff;
       font-size: 14px;
       outline: none;
+    }
+    input[type="text"] {
+      flex: 1;
       user-select: text;
       -webkit-user-select: text;
     }
-    input[type="text"]:focus { border-color: #f59e0b; }
+    input[type="text"]:focus, select:focus { border-color: #f59e0b; }
     input[type="color"] {
       width: 44px; height: 40px;
       border: none; border-radius: 10px;
@@ -133,9 +135,16 @@
     .btn-primary {
       background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
       color: #0b0d14;
-      width: 100%;
-      font-size: 16px;
+      flex: 2;
+      font-size: 15px;
       box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);
+    }
+    .btn-practice {
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      color: #fff;
+      width: 100%;
+      font-size: 14.5px;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
     }
     .btn-blue { background: #2563eb; color: #fff; flex: 1; }
     .btn-green { background: #059669; color: #fff; flex: 1; }
@@ -145,7 +154,7 @@
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 8px;
-      max-height: 210px;
+      max-height: 200px;
       overflow-y: auto;
       padding: 8px;
       background: #0d1018;
@@ -331,11 +340,12 @@
       <div id="p2HpText" class="hp-text">100 / 100</div>
     </div>
     <div id="p2StoneHud" style="font-size:11.5px; color:#9ba3b8; margin-top:4px;">그냥 돌</div>
+    <div id="p2StatusText" style="font-size:11px; color:#f43f5e; margin-top:2px;"></div>
   </div>
 </div>
 
 <div id="keyIndicator" class="hidden">
-  <div>🕹️ <strong>이동:</strong> W A S D / 방향키 &nbsp;|&nbsp; <strong>투척:</strong> 마우스 클릭 &nbsp;|&nbsp; 💚 <strong>자연회복:</strong> +3/초</div>
+  <div>🕹️ <strong>이동:</strong> W A S D / 방향키 &nbsp;|&nbsp; <strong>투척:</strong> 마우스 클릭 &nbsp;|&nbsp; 💚 <strong>자연회복:</strong> +1/초</div>
   <div class="key-badges">
     <div class="k-badge" id="badgeW">W</div>
     <div class="k-badge" id="badgeA">A</div>
@@ -358,7 +368,7 @@
     <div class="how-to-play">
       <div>📖 <strong>전투 규칙 & 조작 안내</strong></div>
       <div>• <strong>이동 & 투척:</strong> PC는 <strong>WASD / 방향키</strong> + <strong>마우스 클릭</strong>, 모바일은 <strong>좌측 조이스틱</strong> + <strong>화면 터치</strong>!</div>
-      <div>• <strong>데스매치 & 자연 회복:</strong> 아레나 벽 밖으로 떨어지지 않으며, 체력이 <strong>1초당 3씩 자동 회복</strong>됩니다. 상대 체력을 0으로 만들면 승리!</div>
+      <div>• <strong>데스매치 & 자연 회복:</strong> 체력이 <strong>1초당 1씩 자동 회복</strong>되며, 상대 체력을 0으로 만들면 승리합니다!</div>
     </div>
 
     <div class="row">
@@ -377,7 +387,16 @@
     <div class="stone-info-box" id="stoneInfoBox">돌을 선택하세요.</div>
 
     <div class="row">
+      <select id="aiDifficultySelect" style="flex: 1; font-weight: 700;">
+        <option value="easy">난이도: 쉬움</option>
+        <option value="medium" selected>난이도: 중간</option>
+        <option value="hard">난이도: 어려움</option>
+      </select>
       <button class="btn-primary" id="btnStartAI">🤖 AI 1:1 데스매치 시작</button>
+    </div>
+
+    <div class="row">
+      <button class="btn-practice" id="btnStartPractice">🎯 연습장 (움직이지 않는 AI로 돌 능력 테스트)</button>
     </div>
 
     <div style="border-top:1px solid #2e364f; padding-top:12px; margin-top:4px;">
@@ -396,7 +415,7 @@
   <div class="panel" style="text-align:center;">
     <h1 id="resultTitle" style="font-size:32px; margin-bottom:10px;">승리!</h1>
     <p id="resultDesc" style="color:#cbd5e1; margin-bottom:20px;">상대의 체력을 모두 소진시켰습니다!</p>
-    <button class="btn-primary" id="btnBackLobby">로비로 돌아가기</button>
+    <button class="btn-primary" id="btnBackLobby" style="width:100%;">로비로 돌아가기</button>
   </div>
 </div>
 
@@ -502,53 +521,46 @@ SoundManager.init();
 document.getElementById('soundToggle').addEventListener('click', (e) => { e.target.blur(); SoundManager.toggle(); });
 
 const RARITY_META = {
-  common:    { label: '일반',     color: '#9ca3af', bg: '#374151' }, // 회색
-  rare:      { label: '레어',     color: '#38bdf8', bg: '#0369a1' }, // 하늘색
-  epic:      { label: '에픽',     color: '#c084fc', bg: '#6b21a8' }, // 보라색
-  mythic:    { label: '신화',     color: '#f43f5e', bg: '#9f1239' }, // 빨간색
-  legendary: { label: '레전더리', color: '#fbbf24', bg: '#92400e' }, // 노란색
-  divine:    { label: '신성',     color: '#d97706', bg: '#78350f' }, // 레전더리보다 진한 노란색
-  secret:    { label: '시크릿',   color: '#4b5563', bg: '#1f2937' }  // 진한 회색
+  common:    { label: '일반',     color: '#9ca3af', bg: '#374151' },
+  rare:      { label: '레어',     color: '#38bdf8', bg: '#0369a1' },
+  epic:      { label: '에픽',     color: '#c084fc', bg: '#6b21a8' },
+  mythic:    { label: '신화',     color: '#f43f5e', bg: '#9f1239' },
+  legendary: { label: '레전더리', color: '#fbbf24', bg: '#92400e' },
+  divine:    { label: '신성',     color: '#d97706', bg: '#78350f' },
+  secret:    { label: '시크릿',   color: '#4b5563', bg: '#1f2937' }
 };
 
 const STONES = [
-  // 일반 (Common)
-  { id: 0,  rarity: 'common',    shape: 'rock',      name: '그냥 돌',          req: 0,  secretReq: 0,  dmg: 20, cd: 1000, speed: 9.5, radius: 10, knock: 10, desc: '가장 기본적인 돌. (데미지 20 / 쿨타임 1.0초)' },
-  { id: 1,  rarity: 'common',    shape: 'moss',      name: '이끼 낀 돌',       req: 1,  secretReq: 0,  dmg: 20, cd: 1000, speed: 9.5, radius: 10, knock: 10, special: 'moss', desc: '적중 시 이끼 독소로 추가 데미지 2를 입힙니다. (기본 20)' },
-  { id: 2,  rarity: 'common',    shape: 'brick',     name: '벽돌',             req: 2,  secretReq: 0,  dmg: 25, cd: 1500, speed: 8.5, radius: 15, knock: 14, desc: '다른 돌보다 1.5배 거대한 붉은 벽돌. (데미지 25 / 쿨타임 1.5초)' },
-  { id: 3,  rarity: 'common',    shape: 'skip',      name: '물수제비 돌',      req: 3,  secretReq: 0,  dmg: 15, cd: 700,  speed: 11,  radius: 9,  knock: 8,  desc: '납작하고 날렵해 빠르게 연속 투척할 수 있습니다. (데미지 15 / 쿨타임 0.7초)' },
+  { id: 0,  rarity: 'common',    shape: 'rock',      name: '그냥 돌',          req: 0,  secretReq: 0,  dmg: 20, cd: 1000, speed: 9.5, radius: 14, knock: 10, desc: '가장 기본적인 돌. (데미지 20 / 쿨타임 1.0초)' },
+  { id: 1,  rarity: 'common',    shape: 'moss',      name: '이끼 낀 돌',       req: 1,  secretReq: 0,  dmg: 20, cd: 1000, speed: 9.5, radius: 14, knock: 10, special: 'moss', desc: '적중 시 이끼 독소로 추가 데미지 2를 입힙니다. (기본 20)' },
+  { id: 2,  rarity: 'common',    shape: 'brick',     name: '벽돌',             req: 2,  secretReq: 0,  dmg: 25, cd: 1500, speed: 8.5, radius: 21, knock: 14, desc: '다른 돌보다 1.5배 거대한 붉은 벽돌. (데미지 25 / 쿨타임 1.5초)' },
+  { id: 3,  rarity: 'common',    shape: 'skip',      name: '물수제비 돌',      req: 3,  secretReq: 0,  dmg: 15, cd: 700,  speed: 11,  radius: 13, knock: 8,  desc: '납작하고 날렵해 빠르게 연속 투척할 수 있습니다. (데미지 15 / 쿨타임 0.7초)' },
 
-  // 레어 (Rare)
-  { id: 4,  rarity: 'rare',      shape: 'fire',      name: '불 돌',            req: 4,  secretReq: 0,  dmg: 20, cd: 1000, speed: 10,  radius: 10, knock: 10, special: 'burn', desc: '적중 시 화상 도트 데미지(1씩 5회)를 입힙니다. (기본 20 / 쿨타임 1.0초)' },
-  { id: 5,  rarity: 'rare',      shape: 'ice',       name: '얼음 돌',          req: 5,  secretReq: 0,  dmg: 20, cd: 1300, speed: 10,  radius: 10, knock: 10, special: 'slow', desc: '적중 시 2.5초간 상대의 이동 속도를 크게 낮춥니다. (기본 20 / 쿨타임 1.3초)' },
-  { id: 6,  rarity: 'rare',      shape: 'electric',  name: '전기 돌',          req: 6,  secretReq: 0,  dmg: 20, cd: 1600, speed: 10.5,radius: 10, knock: 8,  special: 'stun2', desc: '적중 시 감전시켜 상대를 2초간 스턴(기절)시킵니다. (기본 20 / 쿨타임 1.6초)' },
-  { id: 7,  rarity: 'rare',      shape: 'boomerang', name: '부메랑 돌',        req: 7,  secretReq: 0,  dmg: 15, cd: 800,  speed: 11,  radius: 11, knock: 9,  special: 'boomerang', desc: '일정 거리 비행 후 직선으로 되돌아옵니다. (데미지 15 / 쿨타임 0.8초)' },
-  { id: 8,  rarity: 'rare',      shape: 'light',     name: '빛의 돌',          req: 8,  secretReq: 0,  dmg: 15, cd: 1300, speed: 17,  radius: 9,  knock: 9,  desc: '섬광처럼 압도적으로 빠른 속도로 날아갑니다. (데미지 15 / 쿨타임 1.3초)' },
+  { id: 4,  rarity: 'rare',      shape: 'fire',      name: '불 돌',            req: 4,  secretReq: 0,  dmg: 20, cd: 1000, speed: 10,  radius: 14, knock: 10, special: 'burn', desc: '적중 시 화상 도트 데미지(1씩 5회)를 입힙니다. (기본 20 / 쿨타임 1.0초)' },
+  { id: 5,  rarity: 'rare',      shape: 'ice',       name: '얼음 돌',          req: 5,  secretReq: 0,  dmg: 20, cd: 1300, speed: 10,  radius: 14, knock: 10, special: 'slow', desc: '적중 시 2.5초간 상대의 이동 속도를 크게 낮춥니다. (기본 20 / 쿨타임 1.3초)' },
+  { id: 6,  rarity: 'rare',      shape: 'electric',  name: '전기 돌',          req: 6,  secretReq: 0,  dmg: 20, cd: 1600, speed: 10.5,radius: 14, knock: 8,  special: 'stun2', desc: '적중 시 감전시켜 상대를 2초간 스턴(기절)시킵니다. (기본 20 / 쿨타임 1.6초)' },
+  { id: 7,  rarity: 'rare',      shape: 'boomerang', name: '부메랑 돌',        req: 7,  secretReq: 0,  dmg: 15, cd: 800,  speed: 11,  radius: 15, knock: 9,  special: 'boomerang', desc: '일정 거리 비행 후 직선으로 되돌아옵니다. (데미지 15 / 쿨타임 0.8초)' },
+  { id: 8,  rarity: 'rare',      shape: 'light',     name: '빛의 돌',          req: 8,  secretReq: 0,  dmg: 15, cd: 1300, speed: 17,  radius: 13, knock: 9,  desc: '섬광처럼 압도적으로 빠른 속도로 날아갑니다. (데미지 15 / 쿨타임 1.3초)' },
 
-  // 에픽 (Epic)
-  { id: 9,  rarity: 'epic',      shape: 'magnet',    name: '자석 돌',          req: 10, secretReq: 0,  dmg: 20, cd: 1500, speed: 10,  radius: 11, knock: 0,  special: 'magnet', desc: '적중 시 강력한 자력으로 상대를 내 위치 쪽으로 끌어당깁니다. (데미지 20 / 쿨타임 1.5초)' },
-  { id: 10, rarity: 'epic',      shape: 'iron',      name: '아이언 스톤',      req: 12, secretReq: 0,  dmg: 30, cd: 2000, speed: 6,   radius: 17, knock: 16, desc: '크기가 거대하고 느리지만 묵직한 일격을 날립니다. (데미지 30 / 쿨타임 2.0초)' },
-  { id: 11, rarity: 'epic',      shape: 'speed',     name: '스피드 스톤',      req: 14, secretReq: 0,  dmg: 8,  cd: 300,  speed: 13,  radius: 7,  knock: 5,  desc: '0.3초마다 기관총처럼 난사하는 초고속 연사 돌. (데미지 8 / 쿨타임 0.3초)' },
+  { id: 9,  rarity: 'epic',      shape: 'magnet',    name: '자석 돌',          req: 10, secretReq: 0,  dmg: 20, cd: 1500, speed: 10,  radius: 15, knock: 0,  special: 'magnet', desc: '적중 시 강력한 자력으로 상대를 내 위치 쪽으로 끌어당깁니다. (데미지 20 / 쿨타임 1.5초)' },
+  { id: 10, rarity: 'epic',      shape: 'iron',      name: '아이언 스톤',      req: 12, secretReq: 0,  dmg: 30, cd: 2000, speed: 6,   radius: 23, knock: 16, desc: '크기가 거대하고 느리지만 묵직한 일격을 날립니다. (데미지 30 / 쿨타임 2.0초)' },
+  { id: 11, rarity: 'epic',      shape: 'speed',     name: '스피드 스톤',      req: 14, secretReq: 0,  dmg: 8,  cd: 300,  speed: 13,  radius: 10, knock: 5,  desc: '0.3초마다 기관총처럼 난사하는 초고속 연사 돌. (데미지 8 / 쿨타임 0.3초)' },
 
-  // 신화 (Mythic)
-  { id: 12, rarity: 'mythic',    shape: 'blackhole', name: '블랙홀 돌',        req: 16, secretReq: 0,  dmg: 20, cd: 1500, speed: 9.5, radius: 12, knock: 0,  special: 'blackhole', desc: '적중 위치에 2.5초간 블랙홀을 생성해 상대를 중심으로 빨아들입니다. (데미지 20 / 쿨타임 1.5초)' },
-  { id: 13, rarity: 'mythic',    shape: 'shield',    name: '방패 돌',          req: 18, secretReq: 0,  dmg: 20, cd: 1400, speed: 10,  radius: 11, knock: 10, special: 'shield', desc: '적중 시 3초간 적의 돌 3개를 막아주는 보호 방패가 생성됩니다. (데미지 20)' },
-  { id: 14, rarity: 'mythic',    shape: 'vampire',   name: '흡혈 돌',          req: 20, secretReq: 0,  dmg: 18, cd: 1300, speed: 10.5,radius: 10, knock: 10, special: 'vampire', desc: '적중 시 상대 현재 체력의 5%를 추가로 흡수해 내 체력을 채웁니다.' },
+  { id: 12, rarity: 'mythic',    shape: 'blackhole', name: '블랙홀 돌',        req: 16, secretReq: 0,  dmg: 20, cd: 1500, speed: 9.5, radius: 16, knock: 0,  special: 'blackhole', desc: '적중 위치에 2.5초간 블랙홀을 생성해 상대를 중심으로 빨아들입니다. (데미지 20 / 쿨타임 1.5초)' },
+  { id: 13, rarity: 'mythic',    shape: 'shield',    name: '방패 돌',          req: 18, secretReq: 0,  dmg: 20, cd: 1400, speed: 10,  radius: 15, knock: 10, special: 'shield', desc: '적중 시 3초간 적의 돌 3개를 막아주는 보호 방패가 생성됩니다. (데미지 20)' },
+  { id: 14, rarity: 'mythic',    shape: 'vampire',   name: '흡혈 돌',          req: 20, secretReq: 0,  dmg: 18, cd: 1300, speed: 10.5,radius: 14, knock: 10, special: 'vampire', desc: '적중 시 상대 현재 체력의 5%를 추가로 흡수해 내 체력을 채웁니다.' },
 
-  // 레전더리 (Legendary)
-  { id: 15, rarity: 'legendary', shape: 'piston',    name: '피스톤 돌',        req: 23, secretReq: 0,  dmg: 20, cd: 1300, speed: 10.5,radius: 12, knock: 22, desc: '강력한 유압 피스톤 충격으로 넉백량이 1.5배 높습니다. (데미지 20)' },
-  { id: 16, rarity: 'legendary', shape: 'chain',     name: '체인 스톤',        req: 26, secretReq: 0,  dmg: 25, cd: 4000, speed: 11,  radius: 11, knock: 0,  special: 'stun2', desc: '쇠사슬로 상대를 2초간 완전히 정지시킵니다. (데미지 25 / 쿨타임 4.0초)' },
-  { id: 17, rarity: 'legendary', shape: 'blade',     name: '칼날 돌',          req: 30, secretReq: 0,  dmg: 20, cd: 1500, speed: 11.5,radius: 11, knock: 10, special: 'bleed', desc: '출혈 디버프를 일으켜 4초간 상대 체력 회복량을 10% 감소시킵니다. (데미지 20 / 쿨타임 1.5초)' },
+  { id: 15, rarity: 'legendary', shape: 'piston',    name: '피스톤 돌',        req: 23, secretReq: 0,  dmg: 20, cd: 1300, speed: 10.5,radius: 16, knock: 22, desc: '강력한 유압 피스톤 충격으로 넉백량이 1.5배 높습니다. (데미지 20)' },
+  { id: 16, rarity: 'legendary', shape: 'chain',     name: '체인 스톤',        req: 26, secretReq: 0,  dmg: 25, cd: 4000, speed: 11,  radius: 15, knock: 0,  special: 'stun2', desc: '쇠사슬로 상대를 2초간 완전히 정지시킵니다. (데미지 25 / 쿨타임 4.0초)' },
+  { id: 17, rarity: 'legendary', shape: 'blade',     name: '칼날 돌',          req: 30, secretReq: 0,  dmg: 20, cd: 1500, speed: 11.5,radius: 15, knock: 10, special: 'bleed', desc: '깊은 출혈을 일으켜 5초간 상대의 자연 체력 회복을 완전히 차단합니다. (데미지 20 / 쿨타임 1.5초)' },
 
-  // 신성 (Divine)
-  { id: 18, rarity: 'divine',    shape: 'admin',     name: '어드민 스톤',      req: 34, secretReq: 0,  dmg: 15, cd: 2000, speed: 10.5,radius: 11, knock: 8,  special: 'admin', desc: '적중 시 어드민 클론을 소환해 상대에게 돌진시킵니다(클론 데미지 8, 넉백 없음). (돌 데미지 15 / 쿨타임 2.0초)' },
-  { id: 19, rarity: 'divine',    shape: 'poseidon',  name: '포세이돈의 돌',    req: 38, secretReq: 0,  dmg: 15, cd: 1500, speed: 11,  radius: 11, knock: 10, special: 'poseidon', desc: '적중 시 포세이돈의 삼지창이 꽂혀 50의 추가 피해를 줍니다(창 쿨타임 10초). (돌 데미지 15 / 쿨타임 1.5초)' },
-  { id: 20, rarity: 'divine',    shape: 'naruto',    name: '나루토의 돌',      req: 42, secretReq: 0,  dmg: 15, cd: 2000, speed: 11.5,radius: 11, knock: 12, special: 'naruto', desc: '5초마다 나선환이 장전됩니다! 나선환 장착 시 데미지 +10 (빗나가면 소멸). (기본 15 / 쿨타임 2.0초)' },
+  { id: 18, rarity: 'divine',    shape: 'admin',     name: '어드민 스톤',      req: 34, secretReq: 0,  dmg: 15, cd: 2000, speed: 10.5,radius: 15, knock: 8,  special: 'admin', desc: '적중 시 어드민 클론을 소환해 상대에게 돌진시킵니다(클론 데미지 8, 넉백 없음). (돌 데미지 15 / 쿨타임 2.0초)' },
+  { id: 19, rarity: 'divine',    shape: 'poseidon',  name: '포세이돈의 돌',    req: 38, secretReq: 0,  dmg: 15, cd: 1500, speed: 11,  radius: 15, knock: 10, special: 'poseidon', desc: '적중 시 포세이돈의 삼지창이 꽂혀 50의 추가 피해를 줍니다(창 쿨타임 10초). (돌 데미지 15 / 쿨타임 1.5초)' },
+  { id: 20, rarity: 'divine',    shape: 'naruto',    name: '나루토의 돌',      req: 42, secretReq: 0,  dmg: 15, cd: 2000, speed: 11.5,radius: 15, knock: 12, special: 'naruto', desc: '5초마다 나선환이 장전됩니다! 나선환 장착 시 데미지 +10 (빗나가면 소멸). (기본 15 / 쿨타임 2.0초)' },
 
-  // 비밀 (Secret) - 친구 대전 전용 ('?' 표시 및 진한 회색 톤)
-  { id: 21, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 야광 거북이 돌', req: 999, secretReq: 10, dmg: 30, cd: 1000, speed: 5.5, radius: 13, knock: 14, desc: '[친구 대전 10킬 해금] 느리지만 묵직한 야광 거북이 일격! (데미지 30 / 쿨타임 1.0초)' },
-  { id: 22, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 포도당 돌',      req: 999, secretReq: 20, dmg: 20, cd: 3000, speed: 10.5,radius: 11, knock: 10, special: 'glucose', desc: '[친구 대전 20킬 해금] 적중 시 포도당 디버프(2초간 랜덤 스턴 또는 기절) 부여! (데미지 20 / 쿨타임 3.0초)' },
-  { id: 23, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 야광 포마스 돌', req: 999, secretReq: 30, dmg: 20, cd: 2000, speed: 15,  radius: 11, knock: 12, special: 'stun3', desc: '[친구 대전 30킬 해금] 평균 1.5배의 초고속 비행 + 적중 충격으로 3초간 이동 불가! (데미지 20 / 쿨타임 2.0초)' }
+  { id: 21, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 야광 거북이 돌', req: 999, secretReq: 10, dmg: 30, cd: 1000, speed: 5.5, radius: 18, knock: 14, desc: '[친구 대전 10킬 해금] 느리지만 묵직한 야광 거북이 일격! (데미지 30 / 쿨타임 1.0초)' },
+  { id: 22, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 포도당 돌',      req: 999, secretReq: 20, dmg: 20, cd: 3000, speed: 10.5,radius: 15, knock: 10, special: 'glucose', desc: '[친구 대전 20킬 해금] 적중 시 포도당 디버프(2초간 랜덤 스턴 또는 기절) 부여! (데미지 20 / 쿨타임 3.0초)' },
+  { id: 23, rarity: 'secret',    shape: 'secret',    name: '? 우연이의 야광 포마스 돌', req: 999, secretReq: 30, dmg: 20, cd: 2000, speed: 15,  radius: 15, knock: 12, special: 'stun3', desc: '[친구 대전 30킬 해금] 평균 1.5배의 초고속 비행 + 적중 충격으로 3초간 이동 불가! (데미지 20 / 쿨타임 2.0초)' }
 ];
 
 function drawCustomStoneGraphic(c, shape, r, now = Date.now(), isNarutoCharged = false) {
@@ -672,7 +684,7 @@ function drawCustomStoneGraphic(c, shape, r, now = Date.now(), isNarutoCharged =
       c.beginPath(); c.arc(0, 0, isNarutoCharged ? r * 1.15 : r * 0.85, 0, Math.PI * 2); c.fill();
       c.strokeStyle = '#ffffff'; c.lineWidth = 2; c.beginPath(); c.arc(0, 0, r * 0.5, 0, Math.PI * 1.5); c.stroke();
       break;
-    default: // 시크릿 (진한 회색 + '?' 표시)
+    default:
       c.fillStyle = '#1f2937'; c.strokeStyle = '#4b5563'; c.lineWidth = 2;
       c.beginPath(); c.arc(0, 0, r * 0.85, 0, Math.PI * 2); c.fill(); c.stroke();
       c.fillStyle = '#9ca3af'; c.font = `bold ${Math.round(r * 1.1)}px sans-serif`;
@@ -687,13 +699,25 @@ let totalKills = savedData.kills || 0;
 let friendKills = savedData.friendKills || 0;
 let selectedStoneId = savedData.stone || 0;
 
+function isStoneUnlocked(s) {
+  if (document.getElementById('unlockAllCheck').checked) return true;
+  if (s.rarity === 'secret') return friendKills >= s.secretReq;
+  return totalKills >= s.req;
+}
+
+if (!STONES[selectedStoneId] || !isStoneUnlocked(STONES[selectedStoneId])) {
+  selectedStoneId = 0;
+}
+
 function saveUserData() {
+  const curStone = STONES[selectedStoneId] || STONES[0];
+  const permanentUnlocked = curStone.rarity === 'secret' ? (friendKills >= curStone.secretReq) : (totalKills >= curStone.req);
   localStorage.setItem('stoneArenaV2', JSON.stringify({
     kills: totalKills,
     friendKills: friendKills,
     nick: document.getElementById('nicknameInput').value || '플레이어',
     color: document.getElementById('colorInput').value,
-    stone: selectedStoneId
+    stone: permanentUnlocked ? selectedStoneId : 0
   }));
 }
 
@@ -704,15 +728,13 @@ document.getElementById('friendKillsDisplay').textContent = friendKills;
 document.getElementById('hudKills').textContent = totalKills;
 document.getElementById('hudFriendKills').textContent = friendKills;
 
-function isStoneUnlocked(s) {
-  if (document.getElementById('unlockAllCheck').checked) return true;
-  if (s.rarity === 'secret') return friendKills >= s.secretReq;
-  return totalKills >= s.req;
-}
-
 function renderStoneGrid() {
   const grid = document.getElementById('stoneGrid');
   grid.innerHTML = '';
+
+  if (!STONES[selectedStoneId] || !isStoneUnlocked(STONES[selectedStoneId])) {
+    selectedStoneId = 0;
+  }
 
   STONES.forEach(s => {
     const unlocked = isStoneUnlocked(s);
@@ -749,7 +771,7 @@ function renderStoneGrid() {
   document.getElementById('stoneInfoBox').innerHTML = `
     <span class="rarity-tag" style="background:${curMeta.bg}; color:${curMeta.color};">${curMeta.label}</span>
     <strong style="color:${curMeta.color}; font-size:14px;">${cur.name}</strong>
-    <span style="color:#94a3b8; font-size:12px;"> (기본 데미지: ${cur.dmg} / 쿨타임: ${(cur.cd / 1000).toFixed(1)}초)</span><br/>
+    <span style="color:#9ba3b8; font-size:12px;"> (기본 데미지: ${cur.dmg} / 쿨타임: ${(cur.cd / 1000).toFixed(1)}초)</span><br/>
     <span style="color:#e2e8f0;">${cur.desc}</span>
   `;
 }
@@ -839,12 +861,14 @@ window.addEventListener('resize', () => { width = canvas.width = window.innerWid
 
 const gameState = {
   mode: 'menu',
+  aiDifficulty: 'medium',
   arenaRadius: 320,
   lastThrow: 0,
   lastRegenTick: 0,
   lastNarutoCharge: 0,
   narutoReady: false,
   lastPoseidonTime: -10000,
+  p2LastPoseidonTime: -10000,
   projectiles: [],
   clones: [],
   blackholes: [],
@@ -990,7 +1014,11 @@ document.getElementById('btnJoinRoom').onclick = () => {
 function updateHudInfo() {
   document.getElementById('p1NameHud').textContent = gameState.p1.nick;
   document.getElementById('p2NameHud').textContent = gameState.p2.nick;
-  document.getElementById('p2StoneHud').textContent = (STONES[gameState.p2.stoneId] || STONES[0]).name;
+  if (gameState.mode === 'practice') {
+    document.getElementById('p2StoneHud').textContent = '연습용 샌드백 (체력 자동 복구)';
+  } else {
+    document.getElementById('p2StoneHud').textContent = (STONES[gameState.p2.stoneId] || STONES[0]).name;
+  }
 }
 
 function startGame(mode) {
@@ -1001,6 +1029,7 @@ function startGame(mode) {
 
   const now = Date.now();
   gameState.mode = mode;
+  gameState.aiDifficulty = document.getElementById('aiDifficultySelect').value;
   gameState.arenaRadius = Math.max(220, Math.min(380, Math.min(width, height) * 0.42));
   gameState.projectiles = [];
   gameState.clones = [];
@@ -1012,6 +1041,7 @@ function startGame(mode) {
   gameState.lastNarutoCharge = now;
   gameState.narutoReady = true;
   gameState.lastPoseidonTime = -10000;
+  gameState.p2LastPoseidonTime = -10000;
 
   const isGuest = mode === 'p2p_guest';
   gameState.p1 = createPlayerObj(
@@ -1022,9 +1052,12 @@ function startGame(mode) {
   );
 
   if (mode === 'ai') {
+    const diffLabel = { easy: '쉬움', medium: '중간', hard: '어려움' }[gameState.aiDifficulty];
     const normalStones = STONES.filter(s => s.rarity !== 'secret');
     const aiPick = normalStones[Math.floor(Math.random() * normalStones.length)];
-    gameState.p2 = createPlayerObj(120, 0, '#ef4444', 'AI 챌린저', aiPick.id);
+    gameState.p2 = createPlayerObj(120, 0, '#ef4444', `AI (${diffLabel})`, aiPick.id);
+  } else if (mode === 'practice') {
+    gameState.p2 = createPlayerObj(110, 0, '#64748b', '🎯 연습용 샌드백', 0);
   } else {
     gameState.p2.x = isGuest ? -120 : 120;
     gameState.p2.y = 0;
@@ -1045,7 +1078,7 @@ function endGame(isWin, reason) {
   gameState.mode = 'menu';
   resetKeys();
 
-  if (isWin) {
+  if (isWin && prevMode !== 'practice') {
     totalKills += 1;
     if (prevMode.startsWith('p2p')) friendKills += 1;
     saveUserData();
@@ -1078,6 +1111,7 @@ function returnToLobby() {
 }
 
 document.getElementById('btnStartAI').onclick = () => startGame('ai');
+document.getElementById('btnStartPractice').onclick = () => startGame('practice');
 document.getElementById('btnBackLobby').onclick = returnToLobby;
 document.getElementById('btnQuitGame').onclick = returnToLobby;
 
@@ -1118,7 +1152,7 @@ function applyHitEffects(attacker, target, stone, proj, now) {
   if (stone.special === 'slow') { target.slowUntil = now + 2500; }
   if (stone.special === 'stun2' || stone.special === 'glucose') { target.stunUntil = now + 2000; }
   if (stone.special === 'stun3') { target.stunUntil = now + 3000; }
-  if (stone.special === 'bleed') { target.bleedUntil = now + 4000; }
+  if (stone.special === 'bleed') { target.bleedUntil = now + 5000; }
   if (stone.special === 'vampire') {
     const steal = target.hp * 0.05;
     target.hp = Math.max(0, target.hp - steal);
@@ -1144,9 +1178,11 @@ function applyHitEffects(attacker, target, stone, proj, now) {
       gameState.tridents.push({ x: target.x, y: target.y, until: now + 700 });
       spawnParticles(target.x, target.y, '#38bdf8', 24);
       SoundManager.playSpecial();
-    } else if (proj.owner === 2 && Math.random() < 0.35) {
+    } else if (proj.owner === 2 && now - gameState.p2LastPoseidonTime >= 10000) {
+      gameState.p2LastPoseidonTime = now;
       target.hp = Math.max(0, target.hp - 50);
       gameState.tridents.push({ x: target.x, y: target.y, until: now + 700 });
+      spawnParticles(target.x, target.y, '#38bdf8', 24);
       SoundManager.playSpecial();
     }
   }
@@ -1159,9 +1195,8 @@ function update() {
   if (now - gameState.lastRegenTick >= 1000) {
     gameState.lastRegenTick = now;
     [gameState.p1, gameState.p2].forEach(pl => {
-      if (pl.hp > 0 && pl.hp < pl.maxHp) {
-        const regenAmt = now < pl.bleedUntil ? 2.7 : 3.0;
-        pl.hp = Math.min(pl.maxHp, pl.hp + regenAmt);
+      if (pl.hp > 0 && pl.hp < pl.maxHp && now >= pl.bleedUntil) {
+        pl.hp = Math.min(pl.maxHp, pl.hp + 1);
       }
     });
   }
@@ -1199,12 +1234,19 @@ function update() {
   clampToArena(gameState.p1);
 
   if (gameState.mode === 'ai') {
+    const diffConfig = {
+      easy:   { baseSpeed: 1.9, slowSpeed: 1.0, cdDelay: 950, aimSpread: 0.55 },
+      medium: { baseSpeed: 3.3, slowSpeed: 1.8, cdDelay: 350, aimSpread: 0.24 },
+      hard:   { baseSpeed: 4.5, slowSpeed: 2.3, cdDelay: 40,  aimSpread: 0.05 }
+    }[gameState.aiDifficulty] || { baseSpeed: 3.3, slowSpeed: 1.8, cdDelay: 350, aimSpread: 0.24 };
+
     if (now >= gameState.p2.stunUntil) {
-      const p2Speed = now < gameState.p2.slowUntil ? 1.8 : 3.4;
+      const p2Speed = now < gameState.p2.slowUntil ? diffConfig.slowSpeed : diffConfig.baseSpeed;
       const dx = gameState.p1.x - gameState.p2.x;
       const dy = gameState.p1.y - gameState.p2.y;
       const dist = Math.hypot(dx, dy) || 1;
-      const strafe = Math.sin(now * 0.003);
+      const strafeFreq = gameState.aiDifficulty === 'hard' ? 0.005 : 0.003;
+      const strafe = Math.sin(now * strafeFreq);
       const moveX = (-dy / dist) * strafe - gameState.p2.x * 0.005;
       const moveY = (dx / dist) * strafe - gameState.p2.y * 0.005;
       const mLen = Math.hypot(moveX, moveY) || 1;
@@ -1212,9 +1254,9 @@ function update() {
       gameState.p2.y += (moveY / mLen) * p2Speed;
 
       const aiStone = STONES[gameState.p2.stoneId] || STONES[0];
-      if (now - gameState.p2.lastThrow > aiStone.cd + 300) {
+      if (now - gameState.p2.lastThrow > aiStone.cd + diffConfig.cdDelay) {
         gameState.p2.lastThrow = now;
-        const aimAngle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.22;
+        const aimAngle = Math.atan2(dy, dx) + (Math.random() - 0.5) * diffConfig.aimSpread;
         fireStone(2, gameState.p2.x, gameState.p2.y, aimAngle, gameState.p2.stoneId, false);
       }
     }
@@ -1223,6 +1265,20 @@ function update() {
     gameState.p2.vx *= 0.82;
     gameState.p2.vy *= 0.82;
     clampToArena(gameState.p2);
+  } else if (gameState.mode === 'practice') {
+    gameState.p2.x += gameState.p2.vx;
+    gameState.p2.y += gameState.p2.vy;
+    gameState.p2.vx *= 0.82;
+    gameState.p2.vy *= 0.82;
+    clampToArena(gameState.p2);
+    if (gameState.p2.hp <= 0) {
+      gameState.p2.hp = 100;
+      gameState.p2.burnTicks = 0;
+      gameState.p2.bleedUntil = 0;
+      gameState.p2.stunUntil = 0;
+      gameState.p2.slowUntil = 0;
+      spawnParticles(gameState.p2.x, gameState.p2.y, '#38bdf8', 18);
+    }
   } else if (conn && conn.open) {
     conn.send({
       type: 'move',
@@ -1299,21 +1355,30 @@ function update() {
   const remainCd = Math.max(0, myStone.cd - (now - gameState.lastThrow));
   document.getElementById('cooldownText').textContent = remainCd === 0 ? '⚡ 투척 준비 완료!' : `재장전 중... ${(remainCd / 1000).toFixed(1)}s`;
 
-  let spText = '';
-  if (myStone.special === 'naruto') spText = gameState.narutoReady ? '🌀 나선환 장전 완료! (+10 데미지)' : `🌀 나선환 충전 중... ${Math.ceil((5000 - (now - gameState.lastNarutoCharge)) / 1000)}s`;
+  const p1StatusList = [];
+  if (myStone.special === 'naruto') p1StatusList.push(gameState.narutoReady ? '🌀 나선환 장전!' : `🌀 나선환 ${Math.ceil((5000 - (now - gameState.lastNarutoCharge)) / 1000)}s`);
   if (myStone.special === 'poseidon') {
     const pRemain = Math.max(0, 10000 - (now - gameState.lastPoseidonTime));
-    spText = pRemain === 0 ? '🔱 포세이돈의 창 준비 완료!' : `🔱 창 쿨타임: ${(pRemain / 1000).toFixed(1)}s`;
+    p1StatusList.push(pRemain === 0 ? '🔱 창 준비!' : `🔱 창 ${(pRemain / 1000).toFixed(1)}s`);
   }
-  if (gameState.p1.shieldCount > 0 && now < gameState.p1.shieldUntil) spText = `🛡️ 방패 활성 (${gameState.p1.shieldCount}회 방어)`;
-  document.getElementById('specialStatusText').textContent = spText;
+  if (gameState.p1.shieldCount > 0 && now < gameState.p1.shieldUntil) p1StatusList.push(`🛡️ 방패(${gameState.p1.shieldCount})`);
+  if (now < gameState.p1.bleedUntil) p1StatusList.push(`🩸 회복불가(${((gameState.p1.bleedUntil - now) / 1000).toFixed(1)}s)`);
+  document.getElementById('specialStatusText').textContent = p1StatusList.join(' | ');
 
-  if (gameState.p1.hp <= 0) {
-    if (conn && conn.open) conn.send({ type: 'gameover', youWin: true, reason: '상대를 쓰러뜨렸습니다!' });
-    endGame(false, '체력이 모두 소진되어 패배했습니다!');
-  } else if (gameState.p2.hp <= 0) {
-    if (conn && conn.open) conn.send({ type: 'gameover', youWin: false, reason: '체력이 모두 소진되었습니다!' });
-    endGame(true, '상대방의 체력을 0으로 만들어 승리했습니다!');
+  let p2SpText = '';
+  if (now < gameState.p2.bleedUntil) p2SpText = `🩸 회복 불가 (${((gameState.p2.bleedUntil - now) / 1000).toFixed(1)}s)`;
+  else if (now < gameState.p2.stunUntil) p2SpText = `⚡ 기절/정지 (${((gameState.p2.stunUntil - now) / 1000).toFixed(1)}s)`;
+  else if (now < gameState.p2.slowUntil) p2SpText = `❄️ 이동속도 감소 (${((gameState.p2.slowUntil - now) / 1000).toFixed(1)}s)`;
+  document.getElementById('p2StatusText').textContent = p2SpText;
+
+  if (gameState.mode !== 'practice') {
+    if (gameState.p1.hp <= 0) {
+      if (conn && conn.open) conn.send({ type: 'gameover', youWin: true, reason: '상대를 쓰러뜨렸습니다!' });
+      endGame(false, '체력이 모두 소진되어 패배했습니다!');
+    } else if (gameState.p2.hp <= 0) {
+      if (conn && conn.open) conn.send({ type: 'gameover', youWin: false, reason: '체력이 모두 소진되었습니다!' });
+      endGame(true, '상대방의 체력을 0으로 만들어 승리했습니다!');
+    }
   }
 }
 
@@ -1392,12 +1457,15 @@ function draw() {
       ctx.fillStyle = pl.color;
       ctx.fill();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = now < pl.stunUntil ? '#facc15' : (now < pl.slowUntil ? '#38bdf8' : '#ffffff');
+      ctx.strokeStyle = now < pl.stunUntil ? '#facc15' : (now < pl.bleedUntil ? '#f43f5e' : (now < pl.slowUntil ? '#38bdf8' : '#ffffff'));
       ctx.stroke();
 
       if (now < pl.stunUntil) {
         ctx.fillStyle = '#facc15'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
         ctx.fillText('⚡ 기절/정지!', pl.x, pl.y - 42);
+      } else if (now < pl.bleedUntil) {
+        ctx.fillStyle = '#f43f5e'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText('🩸 회복 불가!', pl.x, pl.y - 42);
       }
 
       ctx.fillStyle = '#ffffff';
